@@ -1,66 +1,68 @@
-import uuid
-from sqlalchemy import Column, String, ForeignKey, Date, Text, Enum, Boolean
-from sqlalchemy.sql.expression import text
-from sqlalchemy.sql.sqltypes import TIMESTAMP
-from sqlalchemy.dialects.postgresql import UUID  # Nếu dùng PostgreSQL
-from sqlalchemy.orm import relationship
-from app.db.database import Base
+from pydantic import BaseModel, Field
+from typing import Optional, List, Literal
+from bson import ObjectId
+from datetime import datetime, date
 
 
-class User(Base):
-    __tablename__ = "users"
+class PyObjectId(ObjectId):
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
 
-    # Sửa id thành UUID
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
-    full_name = Column(String, nullable=False)
-    email = Column(String, unique=True, nullable=False)
-    password = Column(String, nullable=False)
-    role = Column(Enum("employee", "manager", "admin", name="user_roles"), nullable=False, server_default="employee")
-    created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False)
-
-    # Quan hệ: Một nhân viên có thể có nhiều đơn xin nghỉ
-    leave_requests = relationship("LeaveRequest", back_populates="employee")
-    approvals = relationship("Approval", back_populates="approver")
+    @classmethod
+    def validate(cls, v):
+        if not ObjectId.is_valid(v):
+            raise ValueError("Invalid ObjectId")
+        return str(v)
 
 
-class LeaveType(Base):
-    __tablename__ = "leave_types"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
-    type_name = Column(String, unique=True, nullable=False)  # VD: "Nghỉ phép năm", "Nghỉ bệnh"
-    description = Column(Text, nullable=True)  # Mô tả về loại nghỉ phép
-
-
-class LeaveRequest(Base):
-    __tablename__ = "leave_requests"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
-    # Cập nhật khóa ngoại thành UUID
-    employee_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    leave_type_id = Column(UUID(as_uuid=True), ForeignKey("leave_types.id", ondelete="SET NULL"), nullable=True)
-    start_date = Column(Date, nullable=False)  # Ngày bắt đầu nghỉ
-    end_date = Column(Date, nullable=False)  # Ngày kết thúc nghỉ
-    reason = Column(Text, nullable=True)  # Lý do xin nghỉ
-    status = Column(Enum("pending", "approved", "rejected", name="leave_status"), nullable=False, server_default="pending")
-    created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False)
-
-    # Quan hệ: Một đơn nghỉ thuộc về một nhân viên
-    employee = relationship("User", back_populates="leave_requests")
-    leave_type = relationship("LeaveType")
-    approvals = relationship("Approval", back_populates="leave_request")
+class Employee(BaseModel):
+    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    full_name: str
+    email: str
+    password: str
+    role: Literal["EMPLOYEE", "ADMIN"] = "EMPLOYEE"
+    created_at: datetime = Field(default_factory=datetime.now())
 
 
-class Approval(Base):
-    __tablename__ = "approvals"
+class LeaveType(BaseModel):
+    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    leave_type_name: str
+    description: Optional[str] = None
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
-    # Cập nhật khóa ngoại thành UUID
-    leave_request_id = Column(UUID(as_uuid=True), ForeignKey("leave_requests.id", ondelete="CASCADE"), nullable=False)
-    approver_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    decision = Column(Enum("approved", "rejected", name="approval_decisions"), nullable=False)
-    decision_date = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False)
-    comments = Column(Text, nullable=True)
 
-    # Quan hệ: Một bản ghi phê duyệt thuộc về một đơn nghỉ
-    leave_request = relationship("LeaveRequest", back_populates="approvals")
-    approver = relationship("User", back_populates="approvals")
+class LeaveRequest(BaseModel):
+    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    employee_id: PyObjectId
+    leave_types_id: PyObjectId
+    start_date: datetime
+    end_date: datetime
+    reason: Optional[str] = None
+    status: Literal["PENDING", "PROCESSING", "REJECT", "ACCEPT"] = "PENDING"
+    created_at: datetime = Field(default_factory=datetime.now())
+
+
+class Approval(BaseModel):
+    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    leave_request_id: PyObjectId
+    employee_id: PyObjectId
+    decision: Literal["REJECT", "ACCEPT"]
+    created_at: datetime = Field(default_factory=datetime.now())
+    comment: Optional[str] = None
+
+
+# Helper Models for Responses
+class EmployeeResponse(Employee):
+    pass
+
+
+class LeaveTypeResponse(LeaveType):
+    pass
+
+
+class LeaveRequestResponse(LeaveRequest):
+    pass
+
+
+class ApprovalResponse(Approval):
+    pass
