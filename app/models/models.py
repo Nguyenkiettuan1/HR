@@ -51,18 +51,3 @@ class Approval(BaseModel):
     comment: Optional[str] = None
 
 
-# Helper Models for Responses
-class EmployeeResponse(Employee):
-    pass
-
-
-class LeaveTypeResponse(LeaveType):
-    pass
-
-
-class LeaveRequestResponse(LeaveRequest):
-    pass
-
-
-class ApprovalResponse(Approval):
-    pass
