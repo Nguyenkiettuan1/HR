@@ -1,13 +1,10 @@
 from pydantic_settings import BaseSettings
 
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    # Database Config
-    db_username: str
-    db_password: str
-    db_hostname: str
-    db_port: str
-    db_name: str
+    mongodb_url: str
+    mongodb_db_name: str
 
     # JWT Config
     secret_key: str
@@ -16,7 +13,6 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
-        env_file_encoding = "utf-8"  # Đảm bảo hỗ trợ UTF-8
-
+        env_file_encoding = "utf-8"
 
 settings = Settings()
